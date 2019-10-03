@@ -1,0 +1,47 @@
+# 3UDP
+# 
+
+units		real
+boundary p p p
+
+atom_style	charge
+
+variable	sname string 3UDP
+variable	min equal 1000
+
+read_data	data.${sname}
+
+pair_style	reax/c lmp_control
+pair_coeff	* * ffield_DNA_protein_K H C N O P
+
+neighbor	2 bin
+neigh_modify	every 10 delay 0 check no
+
+compute reax all pair reax/c
+variable eb      equal c_reax[1]
+variable ea      equal c_reax[2]
+variable elp      equal c_reax[3]
+variable emol      equal c_reax[4]
+variable ev      equal c_reax[5]
+variable epen      equal c_reax[6]
+variable ecoa      equal c_reax[7]
+variable ehb      equal c_reax[8]
+variable et      equal c_reax[9]
+variable eco      equal c_reax[10]
+variable ew    equal c_reax[11]
+variable ep      equal c_reax[12]
+variable efi      equal c_reax[13]
+variable eqeq      equal c_reax[14]
+
+# Thermodynamic vars
+thermo 10
+thermo_style custom step temp epair v_eb v_ea v_elp v_emol v_ev v_epen v_ecoa v_ehb v_et v_eco v_ew v_ep v_efi v_eqeq
+
+timestep 0.5
+
+# Charges
+fix		1 all qeq/reax 1 0.0 10.0 1.0e-6 reax/c
+
+# Minimize system
+minimize        0.0 1.0e-6 ${min} 2000
+

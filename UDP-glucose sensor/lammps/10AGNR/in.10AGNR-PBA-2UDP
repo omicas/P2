@@ -1,0 +1,103 @@
+# 10AGNR-PBA-2UDP
+# 
+
+units		real
+boundary p p f
+
+atom_style	charge
+
+variable	sname string 10AGNR-PBA-2UDP
+variable	min equal 100
+variable	ramp equal 10000
+variable	equil equal 200000
+
+read_data	data.${sname}
+fix walls all wall/reflect zlo EDGE zhi EDGE
+
+# Define graphene atoms
+group graphene id 1:312
+group movable subtract all graphene
+group pbacord id 396:397
+group pbabond id 350 362
+group pyrene id 365 375 376 379 384 385 387 391:407
+
+pair_style	reax/c lmp_control
+pair_coeff	* * ffield_DNA_protein_K H C N O P
+
+neighbor	2 bin
+neigh_modify	every 10 delay 0 check no
+
+compute reax all pair reax/c
+variable eb      equal c_reax[1]
+variable ea      equal c_reax[2]
+variable elp      equal c_reax[3]
+variable emol      equal c_reax[4]
+variable ev      equal c_reax[5]
+variable epen      equal c_reax[6]
+variable ecoa      equal c_reax[7]
+variable ehb      equal c_reax[8]
+variable et      equal c_reax[9]
+variable eco      equal c_reax[10]
+variable ew    equal c_reax[11]
+variable ep      equal c_reax[12]
+variable efi      equal c_reax[13]
+variable eqeq      equal c_reax[14]
+
+compute msd1 pyrene msd com yes average yes
+variable dx1      equal c_msd1[1]
+variable dy1      equal c_msd1[2]
+variable dz1      equal c_msd1[3]
+variable d1       equal c_msd1[4]
+
+# Thermodynamic vars
+thermo 10
+thermo_style custom step temp epair v_eb v_ea v_elp v_emol v_ev v_epen v_ecoa v_ehb v_et v_eco v_ew v_ep v_efi v_eqeq v_d1 v_dx1 v_dy1 v_dz1
+
+timestep 0.5
+
+# Charges
+fix		1 all qeq/reax 1 0.0 10.0 1.0e-6 reax/c
+
+# Fix graphene
+velocity        graphene set 0.0 NULL NULL
+fix             2 graphene setforce 0.0 NULL NULL
+
+# Minimize system
+minimize        0.0 1.0e-6 ${min} 2000
+
+thermo		100
+
+# Integration
+reset_timestep	0
+timestep	0.5
+
+# Trajectory dump, temperature ramp
+dump		1 all xyz 100 traj_temp_ramp_${sname}.xyz
+dump_modify	1 element H C N O P
+
+# set initial velocity to 250K
+velocity 	movable create 250.0 1 rot yes dist gaussian
+
+# NVT ramp from 250 to 300K
+fix 		3 all nvt temp 250.0 300.0 50.0
+
+run 		${ramp}
+unfix 		3
+undump		1
+
+# Trajectory dump, equilibration
+dump            1 all xyz 100 traj_equil_${sname}.xyz
+dump_modify     1 element H C N O P
+#dump 		2 pbacord custom 100 pbacord.txt id type x y z
+#dump_modify	2 format line "%d %d %d %d %d"
+dump 		2 pbacord xyz 100 pbacord_${sname}.txt
+dump_modify     2 element H C N O P
+#dump 		3 pbabond custom 100 pbabond.txt id type x y z
+#dump_modify	3 format line "%d %d %d %d %d"
+dump 		3 pbabond xyz 100 pbabond_${sname}.txt
+dump_modify     3 element H C N O P
+
+# NVT equil at 300K, dumping bonds and species
+fix 		3 all nvt temp 300.0 300.0 50.0
+
+run		${equil}
